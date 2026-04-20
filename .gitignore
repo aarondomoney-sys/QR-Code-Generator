@@ -1,0 +1,5 @@
+qr_codes/
+seen_cars.json
+*.log
+__pycache__/
+.DS_Store
