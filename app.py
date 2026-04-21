@@ -165,10 +165,7 @@ def status():
 if __name__ == "__main__":
     QR_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Scrape on startup if no data yet (first deploy / fresh container)
-    if not STATE_FILE.exists() or STATE_FILE.stat().st_size < 10:
-        log.info("No car data found — running initial full scrape in background…")
-        scrape_in_background(quick=False)
+ 
 
     port = int(os.environ.get("PORT", 8080))
     log.info(f"Hugo Cars QR App on http://0.0.0.0:{port}")
