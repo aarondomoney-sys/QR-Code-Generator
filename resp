@@ -55,7 +55,7 @@ def load_cars() -> list[dict]:
     _cache_mtime = mtime
     return cars
 
-
+xx
 def group_by_make(cars: list[dict]) -> list[dict]:
     """Return list of {make, cars} dicts sorted alphabetically."""
     groups: dict[str, list] = {}
@@ -121,7 +121,8 @@ def index():
 
 @app.route("/qr/<filename>")
 def serve_qr(filename):
-    resp = make_response(send_from_directory(QR_DIR, filename))
+    # This now correctly pulls from static/qr_codes
+    return send_from_directory(QR_DIR, filename)
     resp.headers["Cache-Control"] = "public, max-age=86400"
     return resp
 
