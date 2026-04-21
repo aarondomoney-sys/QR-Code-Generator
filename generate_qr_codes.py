@@ -57,11 +57,12 @@ def safe_filename(text: str) -> str:
     text = re.sub(r"\s+", "_", text.strip())
     return text[:80]
 
-
 def clean_name(name: str) -> str:
     name = re.sub(r"\s+", " ", name).strip()
-    name = re.sub(r"\b([A-Za-z])(?: ([A-Za-z]))+\b", lambda m: m.group(0).replace(" ", ""), name)
+    # This specifically targets patterns like "A 3", "X 5", "Q 7" and removes the space
+    name = re.sub(r"\b([A-Z])\s+(\d)\b", r"\1\2", name)
     return name
+
 
 
 def parse_car(name: str, card_text: str = "") -> dict:
