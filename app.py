@@ -69,20 +69,30 @@ def run_scraper(quick: bool = True):
         return
     refresh_status["running"] = True
     refresh_status["last_message"] = "Checking hugocars.ie…"
-    import signal
-    class TimeoutError(Exception): pass
-    try:
+
+    import concurrent.futures
+    def _scrape():
         import generate_qr_codes as g
         g.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         seen  = g.load_seen_cars()
         cars  = g.scrape_car_listings(quick=quick)
         count = g.process_new_cars(cars, seen)
         g.save_seen_cars(seen)
+        return count
+
+    try:
+        timeout = 180 if quick else 360  # 3 min quick / 6 min full
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(_scrape)
+            count = fut.result(timeout=timeout)
         global _car_cache
         _car_cache = None
         msg = f"{count} new car(s) added." if count else "All up to date."
         refresh_status["last_message"] = msg
         log.info(msg)
+    except concurrent.futures.TimeoutError:
+        refresh_status["last_message"] = "Timed out — site took too long to respond."
+        log.error("Scraper timed out")
     except Exception as e:
         refresh_status["last_message"] = f"Error: {e}"
         log.error(f"Scraper error: {e}")

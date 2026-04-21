@@ -145,16 +145,22 @@ def scrape_car_listings(quick: bool = False) -> list[dict]:
         browser = p.chromium.launch(
             headless=True,
             args=[
-                "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
-                "--disable-extensions", "--disable-background-networking",
-                "--disable-default-apps", "--mute-audio",
-                "--single-process",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--mute-audio",
             ],
         )
         context = browser.new_context()
-        page    = context.new_page()
+        context.set_default_timeout(30000)
+        page = context.new_page()
 
-        # Block images, fonts, and media — we only need the JSON/HTML data
+        # Block images, fonts and media — we only need HTML/JSON data
         page.route("**/*", lambda route: route.abort()
             if route.request.resource_type in ("image", "media", "font", "stylesheet")
             else route.continue_()
