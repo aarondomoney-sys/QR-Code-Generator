@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 app = Flask(__name__)
 
 DATA_DIR   = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
-QR_DIR     = DATA_DIR / "qr_codes"
+QR_DIR     = DATA_DIR / "static" / "qr_codes"
 STATE_FILE = DATA_DIR / "seen_cars.json"
 
 refresh_status = {"running": False, "last_run": None, "last_message": "Ready"}
@@ -81,7 +81,7 @@ def run_scraper(quick: bool = True):
         return count
 
     try:
-        timeout = 180 if quick else 360  # 3 min quick / 6 min full
+        timeout = 600 if quick else 1200  # 10 min quick / 20 min full
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
             fut = ex.submit(_scrape)
             count = fut.result(timeout=timeout)
