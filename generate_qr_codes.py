@@ -74,31 +74,36 @@ def parse_car(name: str, card_text: str = "") -> dict:
     model = ""
     reg   = ""
 
-    # Year: 4-digit number 1990–2030
+    # 1. Year: 4-digit number 1990–2030
     m = re.search(r'\b(19[9]\d|20[0-3]\d)\b', name)
     year = m.group(1) if m else ""
 
-    # Make
+    # 2. Make
     for mk in KNOWN_MAKES:
         if re.search(rf'\b{re.escape(mk)}\b', name, re.IGNORECASE):
             make = mk
             break
 
-    # Model: everything after make (and year)
+    # 3. Model: Clean "A 3" to "A3" and pull details
     if make:
         after = re.sub(rf'^.*?\b{re.escape(make)}\b\s*', '', name, flags=re.IGNORECASE).strip()
         model = re.sub(r'^\d{4}\s*', '', after).strip()
+        model = model.replace(" ", "")  # <--- Fixes "A 3" to "A3"
     elif year:
         model = re.sub(rf'^\s*{year}\s*', '', name).strip()
 
-    # Registration — check card text first, fall back to name
+    # 4. Registration: Better search to find missing plates
+    # We check card_text first, but we remove spaces before searching
     for text in [card_text, name]:
-        m = IRISH_REG.search(text.upper())
+        if not text: continue
+        clean_text = text.upper().replace(" ", "")
+        m = IRISH_REG.search(clean_text)
         if m:
             reg = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
             break
 
     return {"year": year, "make": make or "Other", "model": model or name, "reg": reg, "name": name}
+
 
 
 def extract_cars_from_page(page) -> list[dict]:
