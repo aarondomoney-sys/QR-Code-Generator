@@ -144,10 +144,21 @@ def scrape_car_listings(quick: bool = False) -> list[dict]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+            args=[
+                "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+                "--disable-extensions", "--disable-background-networking",
+                "--disable-default-apps", "--mute-audio",
+                "--single-process",
+            ],
         )
         context = browser.new_context()
         page    = context.new_page()
+
+        # Block images, fonts, and media — we only need the JSON/HTML data
+        page.route("**/*", lambda route: route.abort()
+            if route.request.resource_type in ("image", "media", "font", "stylesheet")
+            else route.continue_()
+        )
 
         api_cars: list[dict] = []
         api_done = {"found": False}

@@ -69,6 +69,8 @@ def run_scraper(quick: bool = True):
         return
     refresh_status["running"] = True
     refresh_status["last_message"] = "Checking hugocars.ie…"
+    import signal
+    class TimeoutError(Exception): pass
     try:
         import generate_qr_codes as g
         g.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
