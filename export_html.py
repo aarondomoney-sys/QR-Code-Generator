@@ -38,6 +38,9 @@ KNOWN_MAKES = sorted([
 
 IRISH_REG = re.compile(r'\b(\d{2,3})[\s\-]?([A-Z]{1,2})[\s\-]?(\d{1,6})\b')
 
+GITHUB_REPO  = "aarondomoney-sys/QR-Code-Generator"
+GITHUB_PAGES = f"https://{GITHUB_REPO.split('/')[0]}.github.io/{GITHUB_REPO.split('/')[1]}/HugoCars_QR_Codes.html"
+
 
 def fix_model(model: str) -> str:
     """Fix spacing issues in model names.
@@ -294,6 +297,31 @@ def build_html(cars: list[dict]) -> str:
     .tag-colour{{background:#f9f9f9;color:#555;border:1px solid #ddd}}
     .tag-stock{{background:#f0f0f0;color:#999;font-family:monospace;font-size:.65rem}}
     .card-actions{{display:flex;gap:6px;padding:0 10px 10px}}
+
+    /* Refresh modal */
+    .modal-bg{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;
+               align-items:center;justify-content:center}}
+    .modal-bg.show{{display:flex}}
+    .modal{{background:#fff;border-radius:8px;padding:28px;width:360px;max-width:92vw;
+            box-shadow:0 8px 40px rgba(0,0,0,.25)}}
+    .modal h3{{font-size:1rem;font-weight:800;margin-bottom:6px;color:var(--black)}}
+    .modal p{{font-size:.82rem;color:var(--muted);margin-bottom:16px;line-height:1.5}}
+    .modal input{{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:4px;
+                  font-size:.85rem;outline:none;margin-bottom:12px}}
+    .modal input:focus{{border-color:var(--red)}}
+    .modal-btns{{display:flex;gap:8px}}
+    .modal-btns button{{flex:1;padding:9px;border-radius:4px;font-size:.82rem;font-weight:700;
+                        cursor:pointer;border:none}}
+    .btn-cancel{{background:var(--grey);color:var(--black)}}
+    .btn-go{{background:var(--red);color:#fff}}
+    .btn-go:disabled{{opacity:.5;cursor:not-allowed}}
+    .status-msg{{font-size:.8rem;color:var(--muted);margin-top:10px;min-height:18px;line-height:1.4}}
+    .status-msg.ok{{color:#1a7a3a}}
+    .status-msg.err{{color:#c0392b}}
+    .spinner{{display:inline-block;width:12px;height:12px;border:2px solid currentColor;
+              border-top-color:transparent;border-radius:50%;animation:spin .65s linear infinite;
+              vertical-align:middle;margin-right:4px}}
+    @keyframes spin{{to{{transform:rotate(360deg)}}}}
     .card-actions a{{flex:1;text-align:center;padding:6px 4px;border-radius:3px;
                      font-size:.72rem;font-weight:700;text-decoration:none;transition:filter .15s}}
     .card-actions a:hover{{filter:brightness(.9)}}
@@ -312,9 +340,29 @@ def build_html(cars: list[dict]) -> str:
     <span class="pill red">{len(cars)} cars</span>
     <span class="pill">Generated: {generated}</span>
     <button class="btn" onclick="downloadAll()">&#x2B07; Download All</button>
+    <button class="btn" id="refreshBtn" onclick="openRefresh()" style="background:var(--red);color:#fff">&#x27F3; Refresh QR Codes</button>
   </div>
 </header>
 <div class="redbar"></div>
+
+<!-- Refresh modal -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>Refresh QR Codes</h3>
+    <p id="modalDesc">This will check hugocars.ie for new cars and update the page for everyone.<br><br>
+    Enter the refresh code to continue. <span id="tokenHint"></span></p>
+    <input type="password" id="tokenInput" placeholder="Refresh code…" autocomplete="off"/>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <input type="checkbox" id="saveToken" checked style="width:auto;margin:0"/>
+      <label for="saveToken" style="font-size:.8rem;color:var(--muted);cursor:pointer">Remember on this device</label>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-go" id="goBtn" onclick="triggerRefresh()">Update Now</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+</div>
 
 <!-- Brand filter -->
 <div class="brand-bar">
@@ -386,6 +434,121 @@ def build_html(cars: list[dict]) -> str:
   function downloadAll() {{
     var links = document.querySelectorAll(".card:not([style*='none']) .act-dl");
     links.forEach((a, i) => setTimeout(() => a.click(), i * 120));
+  }}
+
+  // ── Refresh via GitHub Actions ──────────────────────────────────────────
+  var REPO = "{GITHUB_REPO}";
+  var PAGES_URL = "{GITHUB_PAGES}";
+
+  function openRefresh() {{
+    var saved = localStorage.getItem("hugo_refresh_token");
+    if (saved) {{
+      document.getElementById("tokenInput").value = saved;
+      document.getElementById("tokenHint").textContent = "(saved on this device)";
+    }} else {{
+      document.getElementById("tokenHint").textContent = "Ask Aaron for the refresh code.";
+    }}
+    document.getElementById("statusMsg").textContent = "";
+    document.getElementById("statusMsg").className = "status-msg";
+    document.getElementById("goBtn").disabled = false;
+    document.getElementById("goBtn").textContent = "Update Now";
+    document.getElementById("modalBg").classList.add("show");
+    if (!saved) setTimeout(() => document.getElementById("tokenInput").focus(), 100);
+  }}
+
+  function closeModal() {{
+    document.getElementById("modalBg").classList.remove("show");
+  }}
+
+  function setStatus(msg, cls) {{
+    var el = document.getElementById("statusMsg");
+    el.innerHTML = msg;
+    el.className = "status-msg" + (cls ? " " + cls : "");
+  }}
+
+  async function triggerRefresh() {{
+    var token = document.getElementById("tokenInput").value.trim();
+    if (!token) {{ setStatus("Please enter the refresh code.", "err"); return; }}
+
+    if (document.getElementById("saveToken").checked) {{
+      localStorage.setItem("hugo_refresh_token", token);
+    }}
+
+    document.getElementById("goBtn").disabled = true;
+    document.getElementById("goBtn").innerHTML = '<span class="spinner"></span> Starting…';
+    setStatus("");
+
+    try {{
+      var res = await fetch(
+        "https://api.github.com/repos/" + REPO + "/actions/workflows/update.yml/dispatches",
+        {{
+          method: "POST",
+          headers: {{
+            "Authorization": "Bearer " + token,
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json"
+          }},
+          body: JSON.stringify({{ref: "main"}})
+        }}
+      );
+
+      if (res.status === 204) {{
+        // Workflow triggered — poll for completion
+        setStatus('<span class="spinner"></span> Checking hugocars.ie for new cars… (takes ~2 mins)', "");
+        document.getElementById("goBtn").innerHTML = '<span class="spinner"></span> Running…';
+        pollWorkflow(token);
+      }} else if (res.status === 401) {{
+        setStatus("Invalid refresh code. Ask Aaron for the correct one.", "err");
+        document.getElementById("goBtn").disabled = false;
+        document.getElementById("goBtn").textContent = "Update Now";
+      }} else {{
+        setStatus("Error " + res.status + ". Try again.", "err");
+        document.getElementById("goBtn").disabled = false;
+        document.getElementById("goBtn").textContent = "Update Now";
+      }}
+    }} catch(e) {{
+      setStatus("Network error — are you online?", "err");
+      document.getElementById("goBtn").disabled = false;
+      document.getElementById("goBtn").textContent = "Update Now";
+    }}
+  }}
+
+  async function pollWorkflow(token) {{
+    await new Promise(r => setTimeout(r, 8000)); // wait 8s before first check
+    var attempts = 0;
+    var maxAttempts = 30; // ~5 mins total
+    while (attempts < maxAttempts) {{
+      try {{
+        var res = await fetch(
+          "https://api.github.com/repos/" + REPO + "/actions/runs?per_page=1",
+          {{ headers: {{ "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" }} }}
+        );
+        var data = await res.json();
+        var run = data.workflow_runs && data.workflow_runs[0];
+        if (run) {{
+          if (run.status === "completed") {{
+            if (run.conclusion === "success") {{
+              setStatus("✓ Done! Page updated — reloading in 3 seconds…", "ok");
+              document.getElementById("goBtn").textContent = "Done!";
+              setTimeout(() => {{ window.location.href = PAGES_URL + "?t=" + Date.now(); }}, 3000);
+            }} else {{
+              setStatus("Update finished but something went wrong (conclusion: " + run.conclusion + ").", "err");
+              document.getElementById("goBtn").disabled = false;
+              document.getElementById("goBtn").textContent = "Try Again";
+            }}
+            return;
+          }} else {{
+            var mins = Math.round(attempts * 10 / 60);
+            setStatus('<span class="spinner"></span> Still running… (' + (mins > 0 ? mins + " min" : "under 1 min") + ' so far)', "");
+          }}
+        }}
+      }} catch(e) {{ /* ignore poll errors */ }}
+      await new Promise(r => setTimeout(r, 10000)); // poll every 10s
+      attempts++;
+    }}
+    setStatus("Taking longer than expected. Check back in a few minutes.", "err");
+    document.getElementById("goBtn").disabled = false;
+    document.getElementById("goBtn").textContent = "Try Again";
   }}
 </script>
 </body>
