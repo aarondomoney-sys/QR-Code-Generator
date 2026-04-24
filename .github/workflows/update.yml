@@ -1,0 +1,40 @@
+name: Update QR Codes
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # runs automatically every day at 8am
+  workflow_dispatch:        # lets you click "Run" manually on GitHub anytime
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install chromium --with-deps
+
+      - name: Scrape Hugo Cars & generate QR codes
+        run: python generate_qr_codes.py
+
+      - name: Export HTML
+        run: |
+          python export_html.py
+          cp HugoCars_QR_Codes.html index.html
+
+      - name: Commit results
+        run: |
+          git config user.name "Hugo Cars Bot"
+          git config user.email "action@github.com"
+          git add seen_cars.json qr_codes/ HugoCars_QR_Codes.html index.html
+          git diff --staged --quiet || git commit -m "Update QR codes $(date '+%d %b %Y')"
+          git push
