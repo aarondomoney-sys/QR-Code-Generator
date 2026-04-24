@@ -443,17 +443,23 @@ def build_html(cars: list[dict]) -> str:
   function openRefresh() {{
     var saved = localStorage.getItem("hugo_refresh_token");
     if (saved) {{
+      // Token already saved — skip the modal, trigger immediately
       document.getElementById("tokenInput").value = saved;
-      document.getElementById("tokenHint").textContent = "(saved on this device)";
+      document.getElementById("statusMsg").textContent = "";
+      document.getElementById("statusMsg").className = "status-msg";
+      document.getElementById("goBtn").disabled = false;
+      document.getElementById("goBtn").textContent = "Update Now";
+      document.getElementById("modalBg").classList.add("show");
+      triggerRefresh();
     }} else {{
       document.getElementById("tokenHint").textContent = "Ask Aaron for the refresh code.";
+      document.getElementById("statusMsg").textContent = "";
+      document.getElementById("statusMsg").className = "status-msg";
+      document.getElementById("goBtn").disabled = false;
+      document.getElementById("goBtn").textContent = "Update Now";
+      document.getElementById("modalBg").classList.add("show");
+      setTimeout(() => document.getElementById("tokenInput").focus(), 100);
     }}
-    document.getElementById("statusMsg").textContent = "";
-    document.getElementById("statusMsg").className = "status-msg";
-    document.getElementById("goBtn").disabled = false;
-    document.getElementById("goBtn").textContent = "Update Now";
-    document.getElementById("modalBg").classList.add("show");
-    if (!saved) setTimeout(() => document.getElementById("tokenInput").focus(), 100);
   }}
 
   function closeModal() {{
