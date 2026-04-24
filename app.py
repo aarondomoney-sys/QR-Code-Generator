@@ -1,360 +1,207 @@
 #!/usr/bin/env python3
 """
-Hugo Cars QR Code Generator
-Scrapes hugocars.ie and generates QR codes with make/model/year/reg data.
-
-Usage:
-    python generate_qr_codes.py           # New cars only
-    python generate_qr_codes.py --reset   # Regenerate everything
-    python generate_qr_codes.py --quick   # Fast pass (check for new only)
+Hugo Cars QR Code Web App
+Cloud-hosted on Render. Coworkers open the URL — no install needed.
 """
 
+import io
 import json
+import logging
 import os
-import re
-import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
+import threading
+import zipfile
+from datetime import datetime
 from pathlib import Path
 
-import qrcode
-from PIL import Image, ImageDraw, ImageFont
-from playwright.sync_api import sync_playwright
+from flask import Flask, jsonify, make_response, render_template, send_file, send_from_directory
 
-BASE_URL    = "https://www.hugocars.ie"
-LISTINGS_URL = f"{BASE_URL}/used-cars/"
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+log = logging.getLogger(__name__)
+
+app = Flask(__name__)
 
 DATA_DIR   = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
-OUTPUT_DIR = DATA_DIR / "qr_codes"
+QR_DIR     = DATA_DIR / "qr_codes"
 STATE_FILE = DATA_DIR / "seen_cars.json"
 
-# Common Irish car makes for parsing
-KNOWN_MAKES = [
-    "Audi","BMW","Citroën","Citroen","Dacia","DS","Fiat","Ford","Honda","Hyundai",
-    "Jaguar","Jeep","Kia","Land Rover","Lexus","Mazda","Mercedes","Mercedes-Benz",
-    "Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche","Renault","SEAT","Seat",
-    "Skoda","Škoda","Subaru","Suzuki","Tesla","Toyota","Vauxhall","Volkswagen","Volvo",
-]
-# Longest first so "Land Rover" matches before "Land"
-KNOWN_MAKES.sort(key=len, reverse=True)
+refresh_status = {"running": False, "last_run": None, "last_message": "Ready"}
 
-# Irish plate pattern: 211-D-1234 / 21 D 12345 / 211D1234
-IRISH_REG = re.compile(r'\b(\d{2,3})[\s\-]?([A-Z]{1,2})[\s\-]?(\d{1,6})\b')
+_car_cache = None
+_cache_mtime: float = 0
 
 
-def load_seen_cars() -> dict:
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
-    return {}
+ALL_BRANDS = sorted([
+    "Audi","BMW","Citroën","Dacia","DS","Fiat","Ford","Honda","Hyundai",
+    "Jaguar","Jeep","Kia","Land Rover","Lexus","Mazda","Mercedes-Benz",
+    "Mini","Mitsubishi","Nissan","Opel","Peugeot","Porsche","Renault",
+    "SEAT","Skoda","Subaru","Suzuki","Tesla","Toyota","Volkswagen","Volvo","Other",
+])
 
 
-def save_seen_cars(seen: dict):
-    STATE_FILE.write_text(json.dumps(seen, indent=2))
+def fix_model(model: str) -> str:
+    import re
+    model = model.strip().title()
+    model = re.sub(r'\b([A-Z]) (\d)', r'\1\2', model)
+    model = re.sub(r'\b([A-Z]\d+) (\d)', r'\1\2', model)
+    return model
 
 
-def safe_filename(text: str) -> str:
-    text = re.sub(r"[^\w\s\-]", "", text)
-    text = re.sub(r"\s+", "_", text.strip())
-    return text[:80]
-
-def clean_name(name: str) -> str:
-    name = re.sub(r"\s+", " ", name).strip()
-    # This specifically targets patterns like "A 3", "X 5", "Q 7" and removes the space
-    name = re.sub(r"\b([A-Z])\s+(\d)\b", r"\1\2", name)
-    return name
-
-
-
-def parse_car(name: str, card_text: str = "") -> dict:
-    """Extract year, make, model, reg from a car name and optional full card text."""
-    name = clean_name(name)
-
-    year  = ""
-    make  = ""
-    model = ""
-    reg   = ""
-
-    # 1. Year: 4-digit number 1990–2030
-    m = re.search(r'\b(19[9]\d|20[0-3]\d)\b', name)
-    year = m.group(1) if m else ""
-
-    # 2. Make
-    for mk in KNOWN_MAKES:
-        if re.search(rf'\b{re.escape(mk)}\b', name, re.IGNORECASE):
-            make = mk
-            break
-
-    # 3. Model: Clean "A 3" to "A3" and pull details
-    if make:
-        after = re.sub(rf'^.*?\b{re.escape(make)}\b\s*', '', name, flags=re.IGNORECASE).strip()
-        model = re.sub(r'^\d{4}\s*', '', after).strip()
-        model = model.replace(" ", "")  # <--- Fixes "A 3" to "A3"
-    elif year:
-        model = re.sub(rf'^\s*{year}\s*', '', name).strip()
-
-    # 4. Registration: Better search to find missing plates
-    # We check card_text first, but we remove spaces before searching
-    for text in [card_text, name]:
-        if not text: continue
-        clean_text = text.upper().replace(" ", "")
-        m = IRISH_REG.search(clean_text)
-        if m:
-            reg = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
-            break
-
-    return {"year": year, "make": make or "Other", "model": model or name, "reg": reg, "name": name}
+def load_cars() -> list[dict]:
+    global _car_cache, _cache_mtime
+    if not STATE_FILE.exists():
+        return []
+    mtime = STATE_FILE.stat().st_mtime
+    if _car_cache is not None and mtime == _cache_mtime:
+        return _car_cache
+    data = json.loads(STATE_FILE.read_text())
+    cars = []
+    for url, info in data.items():
+        fp = Path(info.get("file", ""))
+        cars.append({
+            "name":  info.get("name",  "Unknown"),
+            "make":  info.get("make",  "Other"),
+            "model": fix_model(info.get("model", "")),
+            "year":  info.get("year",  ""),
+            "reg":   info.get("reg",   ""),
+            "url":   url,
+            "file":  fp.name if fp.exists() else None,
+        })
+    cars.sort(key=lambda c: (c["make"], c["year"], c["model"]))
+    _car_cache = cars
+    _cache_mtime = mtime
+    return cars
 
 
-
-def extract_cars_from_page(page) -> list[dict]:
-    anchors = page.query_selector_all(
-        "a[href*='car-details'], a[href*='/cars/'], a[href*='/stock/'], a[href*='vehicle']"
-    )
-    results = []
-    seen_hrefs: set[str] = set()
-
-    for a in anchors:
-        href = a.get_attribute("href") or ""
-        if not href or href in seen_hrefs:
-            continue
-        seen_hrefs.add(href)
-        full_url = href if href.startswith("http") else BASE_URL + href
-
-        name       = ""
-        card_text  = ""
-        try:
-            card = a.evaluate_handle(
-                "el => el.closest('.car-card,.vehicle-card,.listing-card,article,.item,li,.col') || el.parentElement"
-            )
-            name      = (page.evaluate("el => el.querySelector('h2,h3,h4,h5')?.innerText || ''", card) or "").strip()
-            card_text = (page.evaluate("el => el.innerText || ''", card) or "").strip()
-        except Exception:
-            pass
-
-        if not name:
-            name = (a.inner_text() or "").strip()
-        if not name:
-            m = re.search(r"[=\/]([^=\/\?&]+)$", href)
-            name = m.group(1).replace("+", " ").replace("-", " ") if m else href
-
-        car = parse_car(name, card_text)
-        car["url"] = full_url
-        results.append(car)
-
-    return results
-
-
-def scrape_car_listings(quick: bool = False) -> list[dict]:
-    """Return list of car dicts for all cars on hugocars.ie."""
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--no-zygote",
-                "--disable-extensions",
-                "--disable-background-networking",
-                "--disable-default-apps",
-                "--mute-audio",
-            ],
-        )
-        context = browser.new_context()
-        context.set_default_timeout(30000)
-        page = context.new_page()
-
-        # Block images, fonts and media — we only need HTML/JSON data
-        page.route("**/*", lambda route: route.abort()
-            if route.request.resource_type in ("image", "media", "font", "stylesheet")
-            else route.continue_()
-        )
-
-        api_cars: list[dict] = []
-        api_done = {"found": False}
-
-        def handle_response(response):
-            if api_done["found"]:
-                return
-            url = response.url
-            if not any(k in url for k in ["api","stock","inventory","vehicle","cars","search"]):
-                return
-            if "json" not in response.headers.get("content-type", ""):
-                return
-            try:
-                data = response.json()
-            except Exception:
-                return
-            items = None
-            if isinstance(data, list) and len(data) > 5:
-                items = data
-            elif isinstance(data, dict):
-                for key in ("data","results","vehicles","cars","stock","items","listings"):
-                    if isinstance(data.get(key), list) and len(data[key]) > 5:
-                        items = data[key]
-                        break
-            if not items:
-                return
-            sample = items[0] if items else {}
-            if not any(k in sample for k in ("make","model","title","name","slug","url","href","id")):
-                return
-            print(f"  [API] {len(items)} cars via {url}")
-            api_done["found"] = True
-            for item in items:
-                item_url = (
-                    item.get("url") or item.get("href") or item.get("link") or
-                    item.get("permalink") or item.get("slug") or ""
-                )
-                if item_url and not item_url.startswith("http"):
-                    item_url = BASE_URL + ("" if item_url.startswith("/") else "/") + item_url
-                if not item_url:
-                    iid = item.get("id") or item.get("stockId") or item.get("stock_id") or ""
-                    item_url = f"{BASE_URL}/car-details/?{iid}" if iid else ""
-                if not item_url:
-                    continue
-
-                raw_name = (
-                    item.get("title") or item.get("name") or
-                    " ".join(filter(None, [
-                        str(item.get("year", "")), item.get("make",""),
-                        item.get("model",""), item.get("variant","") or item.get("trim",""),
-                    ])).strip()
-                )
-                car = parse_car(raw_name)
-                # Override with structured API fields if present
-                if item.get("make"):  car["make"]  = item["make"]
-                if item.get("model"): car["model"] = item["model"]
-                if item.get("year"):  car["year"]  = str(item["year"])
-                for rk in ("registration","reg","regNo","plate","vrm"):
-                    if item.get(rk):
-                        car["reg"] = str(item[rk])
-                        break
-                car["url"] = item_url
-                api_cars.append(car)
-
-        page.on("response", handle_response)
-        print(f"Loading {LISTINGS_URL} ...")
-        page.goto(LISTINGS_URL, wait_until="domcontentloaded", timeout=60000)
-
-        if quick:
-            time.sleep(2)
-            sh = page.evaluate("document.body.scrollHeight")
-            for pos in range(0, sh + 500, 600):
-                page.evaluate(f"window.scrollTo(0,{pos})")
-                time.sleep(0.1)
-            time.sleep(2)
-        else:
-            prev, stale = 0, 0
-            while stale < 4:
-                sh = page.evaluate("document.body.scrollHeight")
-                for pos in range(0, sh + 1000, 400):
-                    page.evaluate(f"window.scrollTo(0,{pos})")
-                    time.sleep(0.15)
-                time.sleep(1.5)
-                for sel in [
-                    "button:text-matches('load more','i')", "a:text-matches('load more','i')",
-                    "button:text-matches('show more','i')", ".load-more", ".show-more",
-                ]:
-                    try:
-                        btn = page.query_selector(sel)
-                        if btn and btn.is_visible():
-                            btn.scroll_into_view_if_needed()
-                            btn.click()
-                            page.wait_for_load_state("networkidle", timeout=10000)
-                            time.sleep(1)
-                            break
-                    except Exception:
-                        pass
-                cur = len(extract_cars_from_page(page))
-                stale = stale + 1 if cur == prev else 0
-                if cur != prev:
-                    print(f"  Cars visible: {cur}")
-                prev = cur
-
-        cars = api_cars if api_cars else extract_cars_from_page(page)
-        browser.close()
-
-    seen_urls: set[str] = set()
-    unique: list[dict] = []
+def group_by_make(cars: list[dict]) -> list[dict]:
+    """Return list of {make, cars} dicts sorted alphabetically."""
+    groups: dict[str, list] = {}
     for c in cars:
-        if c["url"] not in seen_urls:
-            seen_urls.add(c["url"])
-            unique.append(c)
-
-    print(f"\nTotal cars found: {len(unique)}")
-    return unique
+        groups.setdefault(c["make"], []).append(c)
+    return [{"make": make, "cars": lst} for make, lst in sorted(groups.items())]
 
 
-def make_qr(car: dict, output_path: Path):
-    qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=4)
-    qr.add_data(car["url"])
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+def run_scraper(quick: bool = True):
+    if refresh_status["running"]:
+        return
+    refresh_status["running"] = True
+    refresh_status["last_message"] = "Checking hugocars.ie…"
 
-    parts = list(filter(None, [car.get("year",""), car.get("make",""), car.get("model","")]))
-    caption = " ".join(parts) or car.get("name", "")
-    if car.get("reg"):
-        caption += f"  |  {car['reg']}"
-
-    qr_w, qr_h = qr_img.size
-    canvas = Image.new("RGB", (qr_w, qr_h + 54), "white")
-    canvas.paste(qr_img, (0, 0))
-    draw  = ImageDraw.Draw(canvas)
+    import concurrent.futures
+    def _scrape():
+        import generate_qr_codes as g
+        g.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        seen  = g.load_seen_cars()
+        cars  = g.scrape_car_listings(quick=quick)
+        count = g.process_new_cars(cars, seen)
+        g.save_seen_cars(seen)
+        return count
 
     try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 16)
-    except Exception:
-        font = ImageFont.load_default()
-
-    bbox = draw.textbbox((0, 0), caption, font=font)
-    x = max((qr_w - (bbox[2] - bbox[0])) // 2, 4)
-    draw.text((x, qr_h + 10), caption, fill="#111111", font=font)
-    canvas.save(output_path, "PNG")
-
-
-def process_new_cars(cars: list[dict], seen: dict) -> int:
-    """Generate QR codes for cars not already in seen. Returns count of new ones."""
-    new_cars = [c for c in cars if c["url"] not in seen]
-    if not new_cars:
-        return 0
-
-    def process_one(car):
-        filename = safe_filename(f"{car.get('year','')}_{car.get('make','')}_{car.get('model','')}")
-        if not filename.strip("_"):
-            filename = safe_filename(car["url"])
-        out = OUTPUT_DIR / f"{filename}.png"
-        counter = 1
-        while out.exists() and seen.get(car["url"], {}).get("file") != str(out):
-            out = OUTPUT_DIR / f"{filename}_{counter}.png"
-            counter += 1
-        make_qr(car, out)
-        return car["url"], {**car, "file": str(out)}
-
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        for url, info in pool.map(process_one, new_cars):
-            seen[url] = info
-            print(f"  QR: {info['name']}")
-
-    return len(new_cars)
+        timeout = 180 if quick else 360  # 3 min quick / 6 min full
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(_scrape)
+            count = fut.result(timeout=timeout)
+        global _car_cache
+        _car_cache = None
+        msg = f"{count} new car(s) added." if count else "All up to date."
+        refresh_status["last_message"] = msg
+        log.info(msg)
+    except concurrent.futures.TimeoutError:
+        refresh_status["last_message"] = "Timed out — site took too long to respond."
+        log.error("Scraper timed out")
+    except Exception as e:
+        refresh_status["last_message"] = f"Error: {e}"
+        log.error(f"Scraper error: {e}")
+    finally:
+        refresh_status["running"] = False
+        refresh_status["last_run"] = datetime.now()
 
 
-def main():
-    reset = "--reset" in sys.argv
-    quick = "--quick" in sys.argv
+def scrape_in_background(quick: bool = True):
+    threading.Thread(target=run_scraper, kwargs={"quick": quick}, daemon=True).start()
 
-    if reset and STATE_FILE.exists():
-        STATE_FILE.unlink()
-        print("State reset.")
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    seen  = load_seen_cars()
-    cars  = scrape_car_listings(quick=quick)
-    count = process_new_cars(cars, seen)
-    save_seen_cars(seen)
-    print(f"\nDone. {count} new QR code(s) in: {OUTPUT_DIR.resolve()}")
+@app.route("/")
+def index():
+    cars     = load_cars()
+    groups   = group_by_make(cars)
+    in_stock = {c["make"] for c in cars}
+    last     = refresh_status["last_run"]
+    return render_template(
+        "index.html",
+        groups=groups,
+        total=len(cars),
+        last_run=last.strftime("%-d %b %Y at %H:%M") if last else "Never",
+        running=refresh_status["running"],
+        all_brands=ALL_BRANDS,
+        in_stock=in_stock,
+    )
+
+
+@app.route("/export")
+def export():
+    import subprocess
+    subprocess.Popen(["python3", str(Path(__file__).parent / "export_html.py")],
+                     cwd=str(Path(__file__).parent))
+    return """<html><body style="font-family:sans-serif;padding:40px;text-align:center">
+    <h2>&#x2705; Exporting…</h2>
+    <p>HugoCars_QR_Codes.html will open automatically in ~10 seconds.</p>
+    <p><a href="/">← Back</a></p>
+    <script>setTimeout(()=>window.location='/',4000)</script>
+    </body></html>"""
+
+
+@app.route("/qr/<filename>")
+def serve_qr(filename):
+    resp = make_response(send_from_directory(QR_DIR, filename))
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
+
+
+@app.route("/download/<filename>")
+def download_qr(filename):
+    return send_from_directory(QR_DIR, filename, as_attachment=True)
+
+
+@app.route("/download-all")
+def download_all():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for car in load_cars():
+            if car["file"]:
+                p = QR_DIR / car["file"]
+                if p.exists():
+                    zf.write(p, car["file"])
+    buf.seek(0)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name="hugocars_qr_codes.zip")
+
+
+@app.route("/refresh", methods=["POST"])
+def refresh():
+    if refresh_status["running"]:
+        return jsonify({"status": "already_running"})
+    scrape_in_background(quick=True)
+    return jsonify({"status": "started"})
+
+
+@app.route("/status")
+def status():
+    return jsonify({
+        "running":      refresh_status["running"],
+        "last_message": refresh_status["last_message"],
+        "total":        len(load_cars()),
+    })
 
 
 if __name__ == "__main__":
-    main()
+    QR_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Scrape on startup if no data yet (first deploy / fresh container)
+    if not STATE_FILE.exists() or STATE_FILE.stat().st_size < 10:
+        log.info("No car data found — running initial full scrape in background…")
+        scrape_in_background(quick=False)
+
+    port = int(os.environ.get("PORT", 8080))
+    log.info(f"Hugo Cars QR App on http://0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)

@@ -1,0 +1,21 @@
+SETUP INSTRUCTIONS — Hugo Cars QR App
+======================================
+
+STEP 1 — Install Python (one time only)
+-----------------------------------------
+1. Go to: https://www.python.org/downloads/
+2. Click the big yellow "Download Python" button
+3. Run the installer
+4. IMPORTANT: Tick the box that says "Add Python to PATH" before clicking Install
+5. Click Install Now and wait for it to finish
+
+STEP 2 — Start the App
+-----------------------
+1. Open the hugocars_qr folder
+2. Double-click "START APP"
+3. The app will set itself up (takes 1-2 mins first time only)
+4. Your browser will open automatically with all the QR codes
+
+STEP 3 — Next time
+-------------------
+Just double-click "START APP" — it opens straight away.

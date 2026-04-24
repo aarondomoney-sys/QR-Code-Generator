@@ -1,122 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>Hugo Cars — QR Codes</title>
   <style>
-    :root {
-      --red:    #CC1515;
-      --black:  #111111;
-      --dark:   #1c1c1c;
-      --grey:   #f0f0f0;
-      --card:   #ffffff;
-      --border: #e2e2e2;
-      --text:   #1a1a1a;
-      --muted:  #888;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-           background: var(--grey); color: var(--text); }
+    :root{--red:#CC1515;--black:#111111;--grey:#f0f0f0;--border:#e2e2e2;--text:#1a1a1a;--muted:#888}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;background:var(--grey);color:var(--text)}
 
-    /* ── Header ── */
-    header { background: var(--black); padding: 0 28px; display: flex;
-             align-items: stretch; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-    .logo { display: flex; align-items: center; gap: 14px; padding: 16px 0;
-            border-right: 3px solid var(--red); padding-right: 20px; }
-    .logo-h { font-size: 2.4rem; font-weight: 900; color: var(--red); letter-spacing: -1px; line-height: 1; }
-    .logo-label { color: white; font-size: 0.95rem; font-weight: 700; letter-spacing: 2px;
-                  text-transform: uppercase; line-height: 1.3; }
-    .logo-label small { display: block; font-size: 0.65rem; letter-spacing: 1px;
-                        color: rgba(255,255,255,0.45); font-weight: 400; }
-    .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 0; }
-    .pill { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8);
-            border-radius: 4px; padding: 5px 11px; font-size: 0.78rem; white-space: nowrap; }
-    .pill.red { background: var(--red); color: #fff; font-weight: 700; }
+    /* Header */
+    header{background:var(--black);padding:0 28px;display:flex;align-items:stretch;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    .logo{display:flex;align-items:center;gap:14px;padding:16px 0;border-right:3px solid var(--red);padding-right:20px}
+    .logo-h{font-size:2.4rem;font-weight:900;color:var(--red);letter-spacing:-1px;line-height:1}
+    .logo-label{color:white;font-size:.95rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;line-height:1.3}
+    .logo-label small{display:block;font-size:.65rem;letter-spacing:1px;color:rgba(255,255,255,.45);font-weight:400}
+    .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 0}
+    .pill{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border-radius:4px;padding:5px 11px;font-size:.78rem;white-space:nowrap}
+    .pill.red{background:var(--red);color:#fff;font-weight:700}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 15px;border-radius:4px;font-size:.8rem;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:filter .15s;white-space:nowrap}
+    .btn:hover{filter:brightness(1.1)}
+    .btn:active{transform:scale(.97)}
+    .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+    .btn-red{background:var(--red);color:#fff}
+    .btn-white{background:#fff;color:var(--black)}
+    .btn-outline{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.35)}
+    .redbar{height:4px;background:var(--red)}
 
-    /* ── Buttons ── */
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 15px;
-           border-radius: 4px; font-size: 0.8rem; font-weight: 700; cursor: pointer;
-           border: none; text-decoration: none; transition: filter .15s, transform .1s; white-space: nowrap; }
-    .btn:hover  { filter: brightness(1.1); }
-    .btn:active { transform: scale(.97); }
-    .btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
-    .btn-red   { background: var(--red);   color: #fff; }
-    .btn-white { background: #fff;         color: var(--black); }
+    /* Brand filter */
+    .brand-bar{background:white;border-bottom:2px solid var(--border);padding:10px 20px;display:flex;gap:5px;flex-wrap:wrap;align-items:flex-start}
+    .brand-bar-label{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-right:4px;white-space:nowrap;line-height:28px}
+    .brand-btn{padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:white;color:var(--text);font-size:.75rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1;height:28px;display:inline-flex;align-items:center}
+    .brand-btn:hover{border-color:var(--red);color:var(--red)}
+    .brand-btn.active{background:var(--red);border-color:var(--red);color:white}
+    .brand-btn.empty{opacity:.35;cursor:default;font-size:.7rem;padding:4px 10px;border:1.5px solid #ddd;background:white;height:28px}
+    .brand-btn.empty:hover{border-color:#ddd;color:var(--text)}
 
-    /* ── Red bar ── */
-    .redbar { height: 4px; background: var(--red); }
+    /* Toolbar */
+    main{max-width:1500px;margin:0 auto;padding:22px 20px}
+    .toolbar{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+    .search-wrap{position:relative;flex:1;min-width:200px;max-width:320px}
+    .search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.35;pointer-events:none}
+    .search-wrap input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--border);border-radius:4px;font-size:.88rem;outline:none;background:#fff;transition:border-color .15s}
+    .search-wrap input:focus{border-color:var(--red)}
+    .count-label{font-size:.82rem;color:var(--muted);margin-left:auto}
 
-    /* ── Toolbar ── */
-    main { max-width: 1500px; margin: 0 auto; padding: 22px 20px; }
-    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
-    .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 320px; }
-    .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-                       opacity: .35; pointer-events: none; }
-    .search-wrap input { width: 100%; padding: 9px 12px 9px 34px; border: 1.5px solid var(--border);
-                         border-radius: 4px; font-size: .88rem; outline: none; background: #fff;
-                         transition: border-color .15s; }
-    .search-wrap input:focus { border-color: var(--red); }
-    .count-label { font-size: .82rem; color: var(--muted); margin-left: auto; }
+    /* Make sections */
+    .make-section{margin-bottom:32px}
+    .make-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;cursor:pointer;user-select:none}
+    .make-name{font-size:1.05rem;font-weight:800;color:var(--black);text-transform:uppercase;letter-spacing:.5px}
+    .make-count{background:var(--red);color:#fff;border-radius:3px;padding:2px 8px;font-size:.72rem;font-weight:700}
+    .make-toggle{margin-left:auto;color:var(--muted);font-size:1.1rem;transition:transform .2s}
+    .make-header.collapsed .make-toggle{transform:rotate(-90deg)}
+    .make-divider{flex:1;height:1px;background:var(--border)}
+    .make-body.hidden{display:none}
 
-    /* ── Make section ── */
-    .make-section { margin-bottom: 32px; }
-    .make-header {
-      display: flex; align-items: center; gap: 12px;
-      margin-bottom: 12px; cursor: pointer; user-select: none;
-    }
-    .make-name { font-size: 1.05rem; font-weight: 800; color: var(--black);
-                 text-transform: uppercase; letter-spacing: .5px; }
-    .make-count { background: var(--red); color: #fff; border-radius: 3px;
-                  padding: 2px 8px; font-size: .72rem; font-weight: 700; }
-    .make-toggle { margin-left: auto; color: var(--muted); font-size: 1.1rem; transition: transform .2s; }
-    .make-header.collapsed .make-toggle { transform: rotate(-90deg); }
-    .make-divider { flex: 1; height: 1px; background: var(--border); }
+    /* Cards */
+    .car-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .card{background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);border-top:3px solid transparent;display:flex;flex-direction:column;transition:border-color .2s,box-shadow .2s,transform .15s}
+    .card:hover{border-top-color:var(--red);box-shadow:0 4px 12px rgba(0,0,0,.12);transform:translateY(-1px)}
+    .card-qr{padding:8px;background:#fafafa;display:flex;justify-content:center;border-bottom:1px solid var(--border)}
+    .card-qr img{width:90px;height:90px;object-fit:contain}
+    .card-body{padding:7px 8px;flex:1;display:flex;flex-direction:column;gap:3px}
+    .card-model{font-size:.75rem;font-weight:700;color:var(--black);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .card-meta{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+    .tag{font-size:.62rem;font-weight:600;padding:1px 5px;border-radius:3px}
+    .tag-year{background:var(--black);color:#fff}
+    .tag-reg{background:#fff3cd;color:#7a5500;border:1px solid #f0d060;font-family:monospace;letter-spacing:.5px}
+    .card-actions{display:flex;gap:4px;padding:0 7px 7px}
+    .card-actions a{flex:1;text-align:center;padding:5px 3px;border-radius:3px;font-size:.68rem;font-weight:700;text-decoration:none;transition:filter .15s}
+    .card-actions a:hover{filter:brightness(.9)}
+    .act-view{background:var(--grey);color:var(--black);border:1px solid var(--border)}
+    .act-dl{background:var(--red);color:#fff}
 
-    /* ── Car grid ── */
-    .car-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-    .make-body.hidden { display: none; }
-
-    /* ── Car card ── */
-    .card { background: var(--card); border-radius: 4px; overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,.08); border-top: 3px solid transparent;
-            display: flex; flex-direction: column;
-            transition: border-color .2s, box-shadow .2s, transform .15s; }
-    .card:hover { border-top-color: var(--red); box-shadow: 0 5px 16px rgba(0,0,0,.13); transform: translateY(-2px); }
-
-    .card-qr { padding: 14px; background: #fafafa; display: flex; justify-content: center;
-               border-bottom: 1px solid var(--border); }
-    .card-qr img { width: 130px; height: 130px; object-fit: contain; }
-
-    .card-body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-    .card-model { font-size: .82rem; font-weight: 700; color: var(--black); line-height: 1.3;
-                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .card-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-    .tag { font-size: .68rem; font-weight: 600; padding: 2px 7px; border-radius: 3px; }
-    .tag-year { background: var(--black); color: #fff; }
-    .tag-reg  { background: #fff3cd; color: #7a5500; border: 1px solid #f0d060; font-family: monospace; letter-spacing: .5px; }
-    .tag-noreg { background: #f0f0f0; color: #aaa; font-style: italic; }
-
-    .card-actions { display: flex; gap: 6px; padding: 0 10px 10px; }
-    .card-actions a { flex: 1; text-align: center; padding: 6px 4px; border-radius: 3px;
-                      font-size: .72rem; font-weight: 700; text-decoration: none; transition: filter .15s; }
-    .card-actions a:hover { filter: brightness(.9); }
-    .act-view { background: var(--grey); color: var(--black); border: 1px solid var(--border); }
-    .act-dl   { background: var(--red); color: #fff; }
-
-    /* ── Toast ── */
-    .toast { position: fixed; bottom: 22px; right: 22px; background: var(--black); color: #fff;
-             padding: 12px 18px; border-radius: 4px; font-size: .85rem; border-left: 4px solid var(--red);
-             box-shadow: 0 4px 20px rgba(0,0,0,.3); z-index: 999; max-width: 300px;
-             display: none; }
-    .toast.show { display: block; animation: up .25s ease; }
-    @keyframes up { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-
-    .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid currentColor;
-               border-top-color: transparent; border-radius: 50%; animation: spin .65s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .empty { padding: 60px 20px; text-align: center; color: var(--muted); }
+    /* Toast */
+    .toast{position:fixed;bottom:22px;right:22px;background:var(--black);color:#fff;padding:12px 18px;border-radius:4px;font-size:.85rem;border-left:4px solid var(--red);box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:999;max-width:300px;display:none}
+    .toast.show{display:block;animation:up .25s ease}
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .spinner{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .65s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .empty{padding:60px 20px;text-align:center;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -130,6 +93,7 @@
     <span class="pill red">{{ total }} cars</span>
     <span class="pill">Updated: {{ last_run }}</span>
     <a href="/download-all" class="btn btn-white">&#x2B07; Download All</a>
+    <a href="/export" class="btn btn-outline">&#x2709; Export for Colleagues</a>
     <button class="btn btn-red" id="refreshBtn" onclick="triggerRefresh()" {% if running %}disabled{% endif %}>
       {% if running %}<span class="spinner"></span>&nbsp;Checking…
       {% else %}&#x27F3; Check for New Cars{% endif %}
@@ -138,13 +102,23 @@
 </header>
 <div class="redbar"></div>
 
+<!-- Brand filter -->
+<div class="brand-bar">
+  <span class="brand-bar-label">Brand</span>
+  <button class="brand-btn active" onclick="filterBrand('all',this)">All</button>
+  {% for brand in all_brands %}
+  <button class="brand-btn {% if brand not in in_stock %}empty{% endif %}"
+          onclick="filterBrand('{{ brand | lower }}',this)">{{ brand }}</button>
+  {% endfor %}
+</div>
+
 <main>
   <div class="toolbar">
     <div class="search-wrap">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
       </svg>
-      <input type="text" id="searchInput" placeholder="Search by make, model, reg…" oninput="doSearch(this.value)" />
+      <input type="text" id="searchInput" placeholder="Search by make, model or year…" oninput="doSearch(this.value)"/>
     </div>
     <span class="count-label" id="countLabel">{{ total }} cars</span>
   </div>
@@ -160,26 +134,20 @@
       </div>
       <div class="make-body">
         <div class="car-grid">
-          {% for car in group.cars %}
-          {% if car.file %}
+          {% for car in group.cars %}{% if car.file %}
           <div class="card"
-               data-name="{{ car.name | lower }}"
                data-make="{{ car.make | lower }}"
                data-model="{{ car.model | lower }}"
-               data-reg="{{ car.reg | lower }}"
-               data-year="{{ car.year }}">
+               data-year="{{ car.year }}"
+               data-name="{{ car.name | lower }}">
             <div class="card-qr">
-              <img src="/qr/{{ car.file }}" alt="QR {{ car.name }}" loading="lazy" decoding="async" width="130" height="130" />
+              <img src="/qr/{{ car.file }}" alt="QR {{ car.name }}" loading="lazy" width="130" height="130"/>
             </div>
             <div class="card-body">
               <div class="card-model">{{ car.model or car.name }}</div>
               <div class="card-meta">
                 {% if car.year %}<span class="tag tag-year">{{ car.year }}</span>{% endif %}
-                {% if car.reg %}
-                  <span class="tag tag-reg">{{ car.reg }}</span>
-                {% else %}
-                  <span class="tag tag-noreg">No reg</span>
-                {% endif %}
+                {% if car.reg %}<span class="tag tag-reg">{{ car.reg }}</span>{% endif %}
               </div>
             </div>
             <div class="card-actions">
@@ -187,8 +155,7 @@
               <a href="/download/{{ car.file }}" class="act-dl">Download</a>
             </div>
           </div>
-          {% endif %}
-          {% endfor %}
+          {% endif %}{% endfor %}
         </div>
       </div>
     </div>
@@ -201,78 +168,73 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  function toggleMake(header) {
-    header.classList.toggle("collapsed");
-    header.nextElementSibling.classList.toggle("hidden");
+  var activeBrand = 'all';
+
+  function toggleMake(h){
+    h.classList.toggle("collapsed");
+    h.nextElementSibling.classList.toggle("hidden");
   }
 
-  // Debounced search across make, model, reg, year
-  let _st;
-  function doSearch(q) {
-    clearTimeout(_st);
-    _st = setTimeout(() => {
-      const lq = q.toLowerCase().trim();
-      let visible = 0;
+  function filterBrand(brand, btn){
+    if(btn.classList.contains("empty")) return;
+    activeBrand = brand;
+    document.querySelectorAll(".brand-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("searchInput").value = "";
+    applyFilters("");
+  }
 
-      document.querySelectorAll(".make-section").forEach(section => {
-        let sectionVisible = 0;
-        section.querySelectorAll(".card").forEach(card => {
-          const match = !lq ||
-            card.dataset.name.includes(lq) ||
-            card.dataset.make.includes(lq) ||
-            card.dataset.model.includes(lq) ||
-            card.dataset.reg.includes(lq) ||
-            card.dataset.year.includes(lq);
-          card.style.display = match ? "" : "none";
-          if (match) { visible++; sectionVisible++; }
-        });
-        // Hide entire make section if nothing matches
-        section.style.display = sectionVisible > 0 ? "" : "none";
-        // Auto-expand section when searching
-        if (lq && sectionVisible > 0) {
-          section.querySelector(".make-body").classList.remove("hidden");
-          section.querySelector(".make-header").classList.remove("collapsed");
-        }
+  var _st;
+  function doSearch(q){ clearTimeout(_st); _st = setTimeout(()=>applyFilters(q), 120); }
+
+  function applyFilters(q){
+    q = (q||"").toLowerCase().trim();
+    var n = 0;
+    document.querySelectorAll(".make-section").forEach(sec=>{
+      var brandMatch = activeBrand==='all' || sec.dataset.make===activeBrand;
+      if(!brandMatch){ sec.style.display="none"; return; }
+      var sv=0;
+      sec.querySelectorAll(".card").forEach(c=>{
+        var ok = !q||c.dataset.name.includes(q)||c.dataset.make.includes(q)||
+                 c.dataset.model.includes(q)||c.dataset.year.includes(q);
+        c.style.display=ok?"":"none";
+        if(ok){n++;sv++;}
       });
-
-      document.getElementById("countLabel").textContent =
-        visible + " car" + (visible !== 1 ? "s" : "");
-    }, 120);
-  }
-
-  function showToast(msg, ms = 5000) {
-    const t = document.getElementById("toast");
-    t.textContent = msg;
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), ms);
-  }
-
-  function setBtn(loading) {
-    const b = document.getElementById("refreshBtn");
-    b.disabled = loading;
-    b.innerHTML = loading
-      ? '<span class="spinner"></span>&nbsp;Checking…'
-      : '&#x27F3; Check for New Cars';
-  }
-
-  function triggerRefresh() {
-    setBtn(true);
-    fetch("/refresh", { method: "POST" }).then(r => r.json()).then(d => {
-      if (d.status === "already_running") {
-        showToast("Already running — please wait.");
-        setBtn(false);
-        return;
+      sec.style.display=sv?"":"none";
+      if(sv&&q){
+        sec.querySelector(".make-body").classList.remove("hidden");
+        sec.querySelector(".make-header").classList.remove("collapsed");
       }
+    });
+    document.getElementById("countLabel").textContent=n+" car"+(n!==1?"s":"");
+  }
+
+  function showToast(msg,ms=5000){
+    const t=document.getElementById("toast");
+    t.textContent=msg; t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"),ms);
+  }
+
+  function setBtn(loading){
+    const b=document.getElementById("refreshBtn");
+    b.disabled=loading;
+    b.innerHTML=loading?'<span class="spinner"></span>&nbsp;Checking…':'&#x27F3; Check for New Cars';
+  }
+
+  function triggerRefresh(){
+    setBtn(true);
+    fetch("/refresh",{method:"POST"}).then(r=>r.json()).then(d=>{
+      if(d.status==="already_running"){showToast("Already running — please wait.");setBtn(false);return;}
       showToast("Checking hugocars.ie for new cars…");
       pollStatus();
     });
   }
 
-  function pollStatus() {
-    fetch("/status").then(r => r.json()).then(d => {
-      if (d.running) { setTimeout(pollStatus, 2500); return; }
-      showToast("Done — " + d.last_message, 7000);
-      setTimeout(() => location.reload(), 1800);
+  function pollStatus(){
+    fetch("/status").then(r=>r.json()).then(d=>{
+      if(d.running){setTimeout(pollStatus,2500);return;}
+      showToast("Done — "+d.last_message,7000);
+      setTimeout(()=>location.reload(),1800);
     });
   }
 
